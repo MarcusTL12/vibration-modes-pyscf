@@ -19,41 +19,54 @@ function get_atom_coords(mol)
     atoms, reshape(r, 3, length(r) ÷ 3)
 end
 
-function get_nh3_opt()
-    mol = pyscf.gto.M(atom="N 0 0 0; H 1 0 0; H 0 1 0; H 0 0 1"; basis="sto3g")
+function get_mol_opt(atom; basis1="sto3g", basis2="ccpvdz", prec2=1e-10)
+    mol = pyscf.gto.M(atom=atom; basis="sto3g")
     hf = mol.RHF()
 
-    geomopt.optimize(hf;
-        convergence_energy=1e-10,
-        convergence_grms=1e-10,
-        convergence_gmax=1e-10,
-        convergence_drms=1e-10,
-        convergence_dmax=1e-10
-    )
-end
-
-function get_h2o_opt()
-    mol = pyscf.gto.M(atom="O 0 0 0; H 1 0 0; H 0 1 0"; basis="sto3g")
-    hf = mol.RHF()
-
-    mol_opt = geomopt.optimize(hf;
-        convergence_energy=1e-5,
-        convergence_grms=1e-5,
-        convergence_gmax=1e-5,
-        convergence_drms=1e-5,
-        convergence_dmax=1e-5
-    )
+    mol_opt = geomopt.optimize(hf)
     mol_opt.basis = "ccpvdz"
     mol_opt.build()
     hf = mol_opt.RHF()
 
     geomopt.optimize(hf;
-        convergence_energy=1e-10,
-        convergence_grms=1e-10,
-        convergence_gmax=1e-10,
-        convergence_drms=1e-10,
-        convergence_dmax=1e-10
+        convergence_energy=prec2,
+        convergence_grms=prec2,
+        convergence_gmax=prec2,
+        convergence_drms=prec2 * 100,
+        convergence_dmax=prec2 * 100
     )
+end
+
+function get_nh3_opt()
+    get_mol_opt("N 0 0 0; H 1 0 0; H 0 1 0; H 0 0 1")
+end
+
+function get_h2o_opt()
+    get_mol_opt("O 0 0 0; H 1 0 0; H 0 1 0")
+end
+
+function get_ethene_opt()
+    get_mol_opt("""
+C 0  0 0
+C 1  0 0
+H 0  1 0
+H 0 -1 0
+H 1  1 0
+H 1 -1 0
+"""; prec2=1e-7)
+end
+
+function get_ethane_opt()
+    get_mol_opt("""
+C 0  0 0
+C 1  0 0
+H 0  1 0
+H 0 -1 0
+H 0  0 1
+H 1  1 0
+H 1 -1 0
+H 1 -1 1
+"""; prec2=1e-7)
 end
 
 function get_rhf_hessian(mol)
