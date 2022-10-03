@@ -69,8 +69,24 @@ H 1 -1 1
 """; prec2=1e-7)
 end
 
+function get_HCl_opt()
+    get_mol_opt("Cl 0 0 0; H 1 0 0")
+end
+
 function get_rhf_hessian(mol)
     mol.RHF().run().Hessian().hess()
+end
+
+function get_mass_weighted_hessian(h, mol)
+    masslist = mol.atom_mass_list()
+
+    h = copy(h)
+
+    for i in eachindex(masslist), j in eachindex(masslist)
+        h[i, j, :, :] ./= √(masslist[i] * masslist[j])
+    end
+
+    h
 end
 
 function get_hessian_eigen(h)
