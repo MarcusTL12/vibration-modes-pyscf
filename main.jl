@@ -6,6 +6,7 @@ pyscf = pyimport("pyscf")
 geomopt = pyimport("pyscf.geomopt.geometric_solver")
 
 include("writexyz.jl")
+include("num_hess.jl")
 
 const mp::Float64 = 1836.1526734311
 
@@ -124,19 +125,48 @@ H  0.5 0.5 1
 """)
 end
 
+function make_mol(atoms, r, basis)
+    pyscf.gto.M(
+        atom=[(string(a), r[1], r[2], r[3])
+              for (a, r) in zip(atoms, eachcol(r))],
+        basis=basis,
+        unit="bohr"
+    )
+end
+
 function make_rhf_ef(atoms, basis)
     function ef(r)
-        pyscf.gto.M(
-            atom=[(string(a), r[1], r[2], r[3])
-                  for (a, r) in zip(atoms, eachcol(r))],
-            basis=basis,
-            unit="bohr"
-        ).RHF().kernel()
+        make_mol(atoms, r, basis).RHF().kernel()
+    end
+end
+
+function make_ccsd_ef(atoms, basis)
+    function ef(r)
+        make_mol(atoms, r, basis).RHF().run().CCSD().run().e_tot
+    end
+end
+
+function make_ccsd_t_ef(atoms, basis)
+    function ef(r)
+        ccsd = make_mol(atoms, r, basis).RHF().run().CCSD().run()
+        ccsd.e_tot + ccsd.ccsd_t()
+    end
+end
+
+function make_hess_func_2(ef, h)
+    function hess_func(r)
+        get_num_hessian_2(ef, r, h)
     end
 end
 
 function get_rhf_hessian(mol)
     mol.RHF().run().Hessian().hess()
+end
+
+function make_rhf_hess_func(atoms, basis)
+    function hess_func(r)
+        make_mol(atoms, r, basis).RHF().run().Hessian().hess()
+    end
 end
 
 function get_mass_weighted_hessian(h, mol)
@@ -155,7 +185,7 @@ function get_hessian_eigen(h)
     hp = PermutedDimsArray(h, (3, 1, 4, 2))
     hm = reshape(hp, size(hp, 1) * size(hp, 2), size(hp, 3) * size(hp, 4))
 
-    e, v = eigen(hm)
+    e, v = eigen(Symmetric(hm))
 
     e, reshape(v, 3, size(v, 1) ÷ 3, size(v, 2))
 end
@@ -185,13 +215,17 @@ function find_ks(h, v)
     ]
 end
 
-function make_vib_anims(name, mol; linear=false, time_factor=0.5)
-    h = get_rhf_hessian(mol)
+function make_vib_anims(name, mol, hess_func=nothing; linear=false, time_factor=0.5)
+    atoms, r = get_atom_coords(mol)
+
+    if isnothing(hess_func)
+        hess_func = make_rhf_hess_func(atoms, mol.basis)
+    end
+
+    h = hess_func(r)
     hm = get_mass_weighted_hessian(h, mol)
 
     e, v = get_hessian_eigen(hm)
-
-    atoms, r = get_atom_coords(mol)
 
     ks = find_ks(h, v)
 
