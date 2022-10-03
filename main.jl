@@ -7,6 +7,8 @@ geomopt = pyimport("pyscf.geomopt.geometric_solver")
 
 include("writexyz.jl")
 
+const mp::Float64 = 1836.1526734311
+
 function get_atom_coords(mol)
     atoms = String[]
     r = Float64[]
@@ -19,7 +21,7 @@ function get_atom_coords(mol)
     atoms, reshape(r, 3, length(r) ÷ 3)
 end
 
-function get_mol_opt(atom; basis1="sto3g", basis2="ccpvdz", prec2=1e-10)
+function get_mol_opt(atom; basis1="sto3g", basis2="ccpvdz", prec2=1e-9)
     mol = pyscf.gto.M(atom=atom; basis=basis1)
     hf = mol.RHF()
 
@@ -88,12 +90,46 @@ H -2 0 1
 """; prec2=1e-7)
 end
 
+function get_H2_opt()
+    get_mol_opt("H 0 0 0; H 1 0 0"; basis2="ccpvqz")
+end
+
+function get_benzene_opt()
+    get_mol_opt("""
+C 1 2 0
+C 3 1 0
+C 5 2 0
+C 5 4 0
+C 3 5 0
+C 1 4 0
+H 0 1 0
+H 3 0 0
+H 6 1 0
+H 6 5 0
+H 3 6 0
+H 0 5 0
+""")
+end
+
+function get_tetrahedrane_opt()
+    get_mol_opt("""
+C 0   0   0
+C 1   0   0
+C 0.5 1   0
+C 0.5 0.5 0.5
+H -0.5 -0.5 -0.5
+H  1.5 -0.5 -0.5
+H  0.5  1.5 -0.5
+H  0.5 0.5 1
+""")
+end
+
 function get_rhf_hessian(mol)
     mol.RHF().run().Hessian().hess()
 end
 
 function get_mass_weighted_hessian(h, mol)
-    masslist = mol.atom_mass_list() * 1836.1526734311
+    masslist = mol.atom_mass_list() * mp
 
     h = copy(h)
 
@@ -138,12 +174,7 @@ function find_ks(h, v)
     ]
 end
 
-function make_vib_anims(name, mol; newbasis=nothing, linear=false)
-    if !isnothing(newbasis)
-        mol.basis = newbasis
-        mol.build()
-    end
-
+function make_vib_anims(name, mol; linear=false, time_factor=0.5)
     h = get_rhf_hessian(mol)
     hm = get_mass_weighted_hessian(h, mol)
 
@@ -153,15 +184,19 @@ function make_vib_anims(name, mol; newbasis=nothing, linear=false)
 
     ks = find_ks(h, v)
 
+    time_factor *= 25 * √maximum(abs, e)
+
     mkpath(name)
     n_skip = linear ? 5 : 6
     for i in axes(v, 3)[n_skip+1:end]
         e_au = √(abs(e[i]))
         e_cm = e_au * 219474.6
-        println("ħω $i: ", round(e_au, sigdigits=3), "\t=> ",
-            round(e_cm, sigdigits=5), " cm⁻¹,\t",
-            round(ks[i] * 1556.8931028304864; sigdigits=5), " N/m")
-        animate_vib("$name/$i.xyz", atoms, r, v[:, :, i], 0.5, 25)
+        m_eff = (ks[i] / e[i]) / mp
+        println("ħω $i:\t=> ",
+            round(e_cm, sigdigits=5), " cm⁻¹, \t",
+            "k = ", round(ks[i] * 1556.8931028304864; sigdigits=5), " ᴺ/ₘ, \t",
+            "m = ", round(m_eff; sigdigits=3), " mₚ")
+        animate_vib("$name/$i.xyz", atoms, r, v[:, :, i], √(2 * e_au / ks[i]),
+            ceil(Int, time_factor / e_au))
     end
 end
-
