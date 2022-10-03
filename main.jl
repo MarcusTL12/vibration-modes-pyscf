@@ -73,12 +73,27 @@ function get_HCl_opt()
     get_mol_opt("Cl 0 0 0; H 1 0 0")
 end
 
+function get_CO2_opt()
+    get_mol_opt("C 0 0 0; O -1 0 0; O 1 0 0")
+end
+
+function get_2h2o_opt()
+    get_mol_opt("""
+O 0 0 0
+H 1 0 0
+H 0 1 0
+O -2 0 0
+H -1 0 0
+H -2 0 1
+"""; prec2=1e-7)
+end
+
 function get_rhf_hessian(mol)
     mol.RHF().run().Hessian().hess()
 end
 
 function get_mass_weighted_hessian(h, mol)
-    masslist = mol.atom_mass_list()
+    masslist = mol.atom_mass_list() * 1836.1526734311
 
     h = copy(h)
 
@@ -110,3 +125,31 @@ function animate_vib(filename, atoms, r, dr, amp, n_frames)
         end
     end
 end
+
+function make_vib_anims(name, mol; newbasis=nothing)
+    if !isnothing(newbasis)
+        mol.basis = newbasis
+        mol.build()
+    end
+
+    h = get_rhf_hessian(mol)
+    hm = get_mass_weighted_hessian(h, mol)
+
+    e, v = get_hessian_eigen(hm)
+
+    atoms, r = get_atom_coords(mol)
+
+    ks = [v[:]' * reshape(h, 3 * length(atoms), 3 * length(atoms)) * v[:] for v in eachslice(v, dims=3)]
+
+    mkpath(name)
+    for i in axes(v, 3)
+        e_au = √(abs(e[i]))
+        e_cm = e_au * 220000
+        println("ħω $i: ", round(e_au, sigdigits=3), " => ",
+            round(e_cm, sigdigits=3), " cm⁻¹")
+        animate_vib("$name/$i.xyz", atoms, r, v[:, :, i], 0.5, 25)
+    end
+
+    display(ks)
+end
+
