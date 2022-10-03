@@ -20,11 +20,11 @@ function get_atom_coords(mol)
 end
 
 function get_mol_opt(atom; basis1="sto3g", basis2="ccpvdz", prec2=1e-10)
-    mol = pyscf.gto.M(atom=atom; basis="sto3g")
+    mol = pyscf.gto.M(atom=atom; basis=basis1)
     hf = mol.RHF()
 
     mol_opt = geomopt.optimize(hf)
-    mol_opt.basis = "ccpvdz"
+    mol_opt.basis = basis2
     mol_opt.build()
     hf = mol_opt.RHF()
 
@@ -41,8 +41,8 @@ function get_nh3_opt()
     get_mol_opt("N 0 0 0; H 1 0 0; H 0 1 0; H 0 0 1")
 end
 
-function get_h2o_opt()
-    get_mol_opt("O 0 0 0; H 1 0 0; H 0 1 0")
+function get_h2o_opt(basis="ccpvdz")
+    get_mol_opt("O 0 0 0; H 1 0 0; H 0 1 0"; basis2=basis)
 end
 
 function get_ethene_opt()
@@ -126,7 +126,19 @@ function animate_vib(filename, atoms, r, dr, amp, n_frames)
     end
 end
 
-function make_vib_anims(name, mol; newbasis=nothing)
+function find_ks(h, v)
+    hp = PermutedDimsArray(h, (3, 1, 4, 2))
+    hm = reshape(hp, size(hp, 1) * size(hp, 2), size(hp, 3) * size(hp, 4))
+
+    [
+        begin
+            vv = @view v[:]
+            vv' * hm * vv
+        end for v in eachslice(v, dims=3)
+    ]
+end
+
+function make_vib_anims(name, mol; newbasis=nothing, linear=false)
     if !isnothing(newbasis)
         mol.basis = newbasis
         mol.build()
@@ -139,17 +151,17 @@ function make_vib_anims(name, mol; newbasis=nothing)
 
     atoms, r = get_atom_coords(mol)
 
-    ks = [v[:]' * reshape(h, 3 * length(atoms), 3 * length(atoms)) * v[:] for v in eachslice(v, dims=3)]
+    ks = find_ks(h, v)
 
     mkpath(name)
-    for i in axes(v, 3)
+    n_skip = linear ? 5 : 6
+    for i in axes(v, 3)[n_skip+1:end]
         e_au = √(abs(e[i]))
-        e_cm = e_au * 220000
-        println("ħω $i: ", round(e_au, sigdigits=3), " => ",
-            round(e_cm, sigdigits=3), " cm⁻¹")
+        e_cm = e_au * 219474.6
+        println("ħω $i: ", round(e_au, sigdigits=3), "\t=> ",
+            round(e_cm, sigdigits=5), " cm⁻¹,\t",
+            round(ks[i] * 1556.8931028304864; sigdigits=5), " N/m")
         animate_vib("$name/$i.xyz", atoms, r, v[:, :, i], 0.5, 25)
     end
-
-    display(ks)
 end
 
