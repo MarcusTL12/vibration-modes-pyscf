@@ -124,6 +124,17 @@ H  0.5 0.5 1
 """)
 end
 
+function make_rhf_ef(atoms, basis)
+    function ef(r)
+        pyscf.gto.M(
+            atom=[(string(a), r[1], r[2], r[3])
+                  for (a, r) in zip(atoms, eachcol(r))],
+            basis=basis,
+            unit="bohr"
+        ).RHF().kernel()
+    end
+end
+
 function get_rhf_hessian(mol)
     mol.RHF().run().Hessian().hess()
 end
