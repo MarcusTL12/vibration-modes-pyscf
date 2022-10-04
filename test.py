@@ -14,4 +14,4 @@ h_res = harmonic_analysis(mol_opt, h)
 
 atoms, r = vibration.get_atom_coords(mol_opt)
 
-vibration.animate_vibs("nh3", mol, h_res)
+vibration.animate_vibs("anims/nh3", mol_opt, h_res)

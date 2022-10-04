@@ -14,7 +14,8 @@ def get_atom_coords(mol):
 
 
 def write_xyz(f, atoms, r):
-    r = r / 1.8897261245650618
+    Å2B = 1.8897261245650618
+    r = r / Å2B
     f.write(f"{len(atoms)}\n\n")
     for a, xyz in zip(atoms, r):
         f.write(f"{a} {xyz[0]} {xyz[1]} {xyz[2]}\n")
@@ -26,7 +27,9 @@ def write_vib_xyz(filename, atoms, r, dr, amp, nframes):
             write_xyz(f, atoms, r + amp * np.sin(t) * dr)
 
 
-def animate_vibs(name, mol, harmonic_results, time_factor=1.0):
+def animate_vibs(name, mol, harmonic_results, time_factor=1.0, amp_factor=1.0):
+    m_p = 1836.1526734311
+
     atoms, r = get_atom_coords(mol)
 
     modes = harmonic_results["norm_mode"]
@@ -37,5 +40,6 @@ def animate_vibs(name, mol, harmonic_results, time_factor=1.0):
     os.makedirs(name, exist_ok=True)
 
     for i, (mode, e_cm, e, k) in enumerate(zip(modes, wavenumbers, e_au, k_au)):
-        amp = np.sqrt(2 * e / k / (2 * np.pi))
-        write_vib_xyz(f"{name}/{i + 1}.xyz", atoms, r, mode, amp, 13)
+        amp = np.sqrt(e / k / np.sqrt(m_p)) * amp_factor
+        nframes = int(np.ceil(25 * 2000 / e_cm * time_factor))
+        write_vib_xyz(f"{name}/{i + 1}.xyz", atoms, r, mode, amp, nframes)
