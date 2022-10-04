@@ -4,6 +4,7 @@ using OhMyREPL
 
 pyscf = pyimport("pyscf")
 geomopt = pyimport("pyscf.geomopt.geometric_solver")
+thermo = pyimport("pyscf.hessian.thermo")
 
 include("writexyz.jl")
 include("num_hess.jl")
@@ -78,6 +79,10 @@ end
 
 function get_CO2_opt()
     get_mol_opt("C 0 0 0; O -1 0 0; O 1 0 0")
+end
+
+function get_CO_opt()
+    get_mol_opt("C 0 0 0; O 1 0 0")
 end
 
 function get_2h2o_opt()
